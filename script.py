@@ -170,8 +170,8 @@ def _get_top3_features_competitors(df_input):
 ################################################################################
 
 statistics = []
-n=3
-for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 10]:
+n=50
+for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.5, 0.75, 1, 10]:
     for iteration in range(n):
         start_time = datetime.datetime.now()
         dataset = generate_dataset(strength_of_noise=strength_of_noise, random_seed=42+iteration)
@@ -517,7 +517,7 @@ for strength_of_noise in statistics_df["strength_of_noise"].unique():
             "ind_max_ci_upper": ci_ind_max[1]
         })
         
-        # Plot QQ-plots and scatter plots for each statistic
+        # Plot QQ-plots and histograms for each statistic
         fig, axes = plt.subplots(4, 3, figsize=(15, 20))
         
         # QQ plots for dependent statistics
@@ -540,37 +540,37 @@ for strength_of_noise in statistics_df["strength_of_noise"].unique():
         stats.probplot(independent_stats_max, dist="lognorm", sparams=(shape_ind_max, loc_ind_max, scale_ind_max), plot=axes[1, 2])
         axes[1, 2].set_title(f'QQ Plot - Max Independent Stats\n{method} - Noise: {strength_of_noise}')
         
-        # Scatter plots with lognormal distribution for dependent statistics
+        # Histograms with lognormal distribution for dependent statistics
         x_avg = np.linspace(dependent_stats_avg.min(), dependent_stats_avg.max(), 100)
-        axes[2, 0].scatter(dependent_stats_avg, np.zeros_like(dependent_stats_avg), alpha=0.5)
+        axes[2, 0].hist(dependent_stats_avg, bins=30, density=True, alpha=0.5)
         axes[2, 0].plot(x_avg, stats.lognorm.pdf(x_avg, shape_avg, loc=loc_avg, scale=scale_avg), 'r-', lw=2)
-        axes[2, 0].set_title(f'Scatter Plot - Avg Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        axes[2, 0].set_title(f'Histogram - Avg Dependent Stats\n{method} - Noise: {strength_of_noise}')
         
         x_min = np.linspace(dependent_stats_min.min(), dependent_stats_min.max(), 100)
-        axes[2, 1].scatter(dependent_stats_min, np.zeros_like(dependent_stats_min), alpha=0.5)
+        axes[2, 1].hist(dependent_stats_min, bins=30, density=True, alpha=0.5)
         axes[2, 1].plot(x_min, stats.lognorm.pdf(x_min, shape_min, loc=loc_min, scale=scale_min), 'r-', lw=2)
-        axes[2, 1].set_title(f'Scatter Plot - Min Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        axes[2, 1].set_title(f'Histogram - Min Dependent Stats\n{method} - Noise: {strength_of_noise}')
         
         x_max = np.linspace(dependent_stats_max.min(), dependent_stats_max.max(), 100)
-        axes[2, 2].scatter(dependent_stats_max, np.zeros_like(dependent_stats_max), alpha=0.5)
+        axes[2, 2].hist(dependent_stats_max, bins=30, density=True, alpha=0.5)
         axes[2, 2].plot(x_max, stats.lognorm.pdf(x_max, shape_max, loc=loc_max, scale=scale_max), 'r-', lw=2)
-        axes[2, 2].set_title(f'Scatter Plot - Max Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        axes[2, 2].set_title(f'Histogram - Max Dependent Stats\n{method} - Noise: {strength_of_noise}')
         
-        # Scatter plots with lognormal distribution for independent statistics
+        # Histograms with lognormal distribution for independent statistics
         x_ind_avg = np.linspace(independent_stats_avg.min(), independent_stats_avg.max(), 100)
-        axes[3, 0].scatter(independent_stats_avg, np.zeros_like(independent_stats_avg), alpha=0.5)
+        axes[3, 0].hist(independent_stats_avg, bins=30, density=True, alpha=0.5)
         axes[3, 0].plot(x_ind_avg, stats.lognorm.pdf(x_ind_avg, shape_ind_avg, loc=loc_ind_avg, scale=scale_ind_avg), 'r-', lw=2)
-        axes[3, 0].set_title(f'Scatter Plot - Avg Independent Stats\n{method} - Noise: {strength_of_noise}')
+        axes[3, 0].set_title(f'Histogram - Avg Independent Stats\n{method} - Noise: {strength_of_noise}')
         
         x_ind_min = np.linspace(independent_stats_min.min(), independent_stats_min.max(), 100)
-        axes[3, 1].scatter(independent_stats_min, np.zeros_like(independent_stats_min), alpha=0.5)
+        axes[3, 1].hist(independent_stats_min, bins=30, density=True, alpha=0.5)
         axes[3, 1].plot(x_ind_min, stats.lognorm.pdf(x_ind_min, shape_ind_min, loc=loc_ind_min, scale=scale_ind_min), 'r-', lw=2)
-        axes[3, 1].set_title(f'Scatter Plot - Min Independent Stats\n{method} - Noise: {strength_of_noise}')
+        axes[3, 1].set_title(f'Histogram - Min Independent Stats\n{method} - Noise: {strength_of_noise}')
         
         x_ind_max = np.linspace(independent_stats_max.min(), independent_stats_max.max(), 100)
-        axes[3, 2].scatter(independent_stats_max, np.zeros_like(independent_stats_max), alpha=0.5)
+        axes[3, 2].hist(independent_stats_max, bins=30, density=True, alpha=0.5)
         axes[3, 2].plot(x_ind_max, stats.lognorm.pdf(x_ind_max, shape_ind_max, loc=loc_ind_max, scale=scale_ind_max), 'r-', lw=2)
-        axes[3, 2].set_title(f'Scatter Plot - Max Independent Stats\n{method} - Noise: {strength_of_noise}')
+        axes[3, 2].set_title(f'Histogram - Max Independent Stats\n{method} - Noise: {strength_of_noise}')
         
         plt.tight_layout()
         plt.show()
