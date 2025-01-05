@@ -216,7 +216,7 @@ for strength_of_noise in [0.01, 0.1, 1, 10]:
         statistics.append(e)
 
         finish_time = datetime.datetime.now()
-        print(f"Time taken: {finish_time - start_time}")
+        print(f"{strength_of_noise} - {iteration} - Time taken: {finish_time - start_time}")
 
 # Convert statistics to DataFrame and calculate additional statistics
 statistics_df = pd.DataFrame(statistics)
