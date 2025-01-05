@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mutual_info_score
 from sklearn.feature_selection import mutual_info_regression
-from sklearn.preprocessing import KBinsDiscretizer
 import dcor
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
@@ -66,59 +65,6 @@ def mutual_information(dataset):
             mi_scores[j, i] = mi_scores[i, j]  # Symmetry
     return mi_scores
 
-# Function to calculate Conditional Entropy (using discretization) between pairs of features
-def conditional_entropy_inverse(dataset, n_bins=5):
-    n_features = dataset.shape[1]
-    ce_scores = np.zeros((n_features, n_features))
-    
-    # Discretize the features
-    discretizer = KBinsDiscretizer(n_bins=n_bins, encode='ordinal', strategy='quantile')
-    discretized_data = discretizer.fit_transform(dataset)
-    
-    # Calculate conditional entropy for each pair of features
-    for i in range(n_features):
-        for j in range(n_features):
-            if i != j:
-                p_xy = np.histogram2d(discretized_data[:, i], discretized_data[:, j], bins=n_bins)[0] / len(dataset)
-                p_x = np.sum(p_xy, axis=1)
-                p_y = np.sum(p_xy, axis=0)
-                
-                ce = 0
-                for x in range(n_bins):
-                    for y in range(n_bins):
-                        if p_xy[x, y] > 0 and p_x[x] > 0 and p_y[y] > 0:
-                            ce += p_xy[x, y] * np.log(p_xy[x, y] / (p_x[x] * p_y[y]))
-                
-                ce = max(0, -ce)
-                if ce == 0:
-                    ce_scores[i, j] = 0
-                else:
-                    ce_scores[i, j] = 1 / ce
-    return ce_scores
-
-# Unit test for conditional_entropy function
-def test_conditional_entropy_inverse():
-    # Create a simple dataset
-    dataset = np.array([[0, 1, 2],
-                        [1, 2, 3],
-                        [2, 3, 4],
-                        [3, 4, 5]])
-    
-    # Expected result is a symmetric matrix with non-negative values
-    ce_scores = conditional_entropy_inverse(dataset, n_bins=2)
-    
-    # Check if the result is a square matrix
-    assert ce_scores.shape[0] == ce_scores.shape[1], "Result should be a square matrix"
-    
-    # Check if the matrix is symmetric
-    assert np.allclose(ce_scores, ce_scores.T, equal_nan=True), "Matrix should be symmetric"
-    
-    # Check if all values are non-negative
-    assert np.all(np.nan_to_num(ce_scores) >= 0), "All values should be non-negative"
-
-# Run the unit test
-test_conditional_entropy_inverse()
-
 # Function to calculate Correlation of Distances (using dcor) between pairs of features
 def correlation_of_distances(dataset):
     n_features = dataset.shape[1]
@@ -135,13 +81,11 @@ def correlation_of_distances(dataset):
 def competitor_methods(dataset):
     pearson_corr = pearson_correlation(dataset)
     mi_scores = mutual_information(dataset)
-    ce_scores = conditional_entropy_inverse(dataset)
     dcor_scores = correlation_of_distances(dataset)
     
     return {
         "Pearson Correlation (abs)": pearson_corr,
         "Mutual Information": mi_scores,
-        "Conditional Entropy (inverse)": ce_scores,
         "Distance Correlation": dcor_scores
     }
 
@@ -234,7 +178,7 @@ for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 1
         competitor_results = competitor_methods(dataset)
 
         # Calculate statistics for each competitor method
-        for alias in ["Pearson Correlation (abs)", "Mutual Information", "Conditional Entropy (inverse)", "Distance Correlation"]:
+        for alias in ["Pearson Correlation (abs)", "Mutual Information", "Distance Correlation"]:
             e = {"strength_of_noise": strength_of_noise}
             df = pd.DataFrame(competitor_results[alias])
             if alias == "Pearson Correlation (abs)":
