@@ -8,6 +8,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score
 import copy
+import datetime
+import scipy.stats as stats
+import matplotlib.pyplot as plt
+import scipy.stats as stats
 
 import warnings
 
@@ -131,7 +135,7 @@ def proposed_method(dataset, random_seed=None):
     # Define the Random Forest classifier and hyperparameter grid, including random seed for the classifier
     rf = RandomForestClassifier(random_state=random_seed)
     param_grid = {
-        'n_estimators': [50, 100, 200],
+        'n_estimators': [100],
         'max_depth': [None, 10, 20],
         'min_samples_split': [2, 5, 10]
     }
@@ -168,8 +172,7 @@ def _flatten_df(df_input):
 
 def _get_statistic_of_independent_features(df_input):
     df = copy.deepcopy(df_input)
-    df = df[df['feature_1'] < 7]
-    df = df[df['feature_2'] < 7]
+    df = df[(df['feature_1'] < 7) | (df['feature_2'] < 7)]
     return df["Value"].mean(), df["Value"].min(), df["Value"].max()
 
 
@@ -190,64 +193,72 @@ def _get_top3_features_competitors(df_input):
 
 
 statistics = []
-for strength_of_noise in [0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 10]:
-    dataset = generate_dataset(strength_of_noise=strength_of_noise, random_seed=42)
-    competitor_results = competitor_methods(dataset)
+n=3
+for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 10]:
+    for iteration in range(n):
+        start_time = datetime.datetime.now()
+        dataset = generate_dataset(strength_of_noise=strength_of_noise, random_seed=42+iteration)
+        competitor_results = competitor_methods(dataset)
 
-    print("========================================")
-    print(f"strength_of_noise: {strength_of_noise}")
-    print("========================================")
+        # print("========================================")
+        # print(f"strength_of_noise: {strength_of_noise}")
+        # print("========================================")
 
-    print("Pearson_Correlation:")
-    print(pd.DataFrame(competitor_results["Pearson Correlation"]).abs().to_string())
-    print()
-    print("Mutual_Information:")
-    print(pd.DataFrame(competitor_results["Mutual Information"]).to_string())
-    print()
-    print("Conditional_Entropy:")
-    print(pd.DataFrame(competitor_results["Conditional Entropy"]).to_string())
-    print()
-    print("Distance_Correlation:")
-    print(pd.DataFrame(competitor_results["Distance Correlation"]).to_string())
-    print()
+        # print("Pearson_Correlation:")
+        # print(pd.DataFrame(competitor_results["Pearson Correlation"]).abs().to_string())
+        # print()
+        # print("Mutual_Information:")
+        # print(pd.DataFrame(competitor_results["Mutual Information"]).to_string())
+        # print()
+        # print("Conditional_Entropy:")
+        # print(pd.DataFrame(competitor_results["Conditional Entropy"]).to_string())
+        # print()
+        # print("Distance_Correlation:")
+        # print(pd.DataFrame(competitor_results["Distance Correlation"]).to_string())
+        # print()
 
-    accuracy, feature_importances, best_rf = proposed_method(dataset, random_seed=42)
-    print("The Proposed Method:")
-    print("Accuracy:", accuracy)
-    print("Feature Importances:", pd.DataFrame(feature_importances).to_string())
+        accuracy, feature_importances, best_rf = proposed_method(dataset, random_seed=42)
+        # print("The Proposed Method:")
+        # print("Accuracy:", accuracy)
+        # print("Feature Importances:", pd.DataFrame(feature_importances).to_string())
 
-    for alias in ["Pearson Correlation", "Mutual Information", "Conditional Entropy", "Distance Correlation"]:
+        for alias in ["Pearson Correlation", "Mutual Information", "Conditional Entropy", "Distance Correlation"]:
+            e = {"strength_of_noise": strength_of_noise}
+            df = pd.DataFrame(competitor_results[alias])
+            if alias == "Pearson Correlation":
+                df = df.abs()
+            df = _flatten_df(df)
+            e["iteration"] = iteration
+            e["Method"] = alias.replace(" ", "_")
+            e["avg_independent_features_statistics"], e["min_independent_features_statistics"], e["max_independent_features_statistics"] = _get_statistic_of_independent_features(df)
+            e["avg_dependent_features_statistics"], e["min_dependent_features_statistics"], e["max_dependent_features_statistics"] = _get_statistic_of_dependent_features(df)
+            e["top3_selected_features"] = _get_top3_features_competitors(df)
+            statistics.append(e)
+        
+        df = pd.DataFrame(feature_importances, columns=["Value"])
+        df = df.sort_values("Value", ascending=True)
+        df = df.reset_index()
+        proposed_method_independent_features_statistics_avg = df[df["index"] < 7]["Value"].mean()
+        proposed_method_dependent_features_statistics_avg = df[df["index"] >= 7]["Value"].mean()
+        proposed_method_independent_features_statistics_min = df[df["index"] < 7]["Value"].min()
+        proposed_method_dependent_features_statistics_min = df[df["index"] >= 7]["Value"].min()
+        proposed_method_independent_features_statistics_max = df[df["index"] < 7]["Value"].max()
+        proposed_method_dependent_features_statistics_max = df[df["index"] >= 7]["Value"].max()
+        proposed_method_top3_selected_features = str(sorted(df.tail(3)["index"].values.tolist()))
         e = {"strength_of_noise": strength_of_noise}
-        df = pd.DataFrame(competitor_results[alias])
-        if alias == "Pearson Correlation":
-            df = df.abs()
-        df = _flatten_df(df)
-        e["Method"] = alias.replace(" ", "_")
-        e["avg_independent_features_statistics"], e["min_independent_features_statistics"], e["max_independent_features_statistics"] = _get_statistic_of_independent_features(df)
-        e["avg_dependent_features_statistics"], e["min_dependent_features_statistics"], e["max_dependent_features_statistics"] = _get_statistic_of_dependent_features(df)
-        e["top3_selected_features"] = _get_top3_features_competitors(df)
+        e["iteration"] = iteration
+        e["Method"] = "Proposed_Method"
+        e["avg_independent_features_statistics"] = proposed_method_independent_features_statistics_avg
+        e["avg_dependent_features_statistics"] = proposed_method_dependent_features_statistics_avg
+        e["min_independent_features_statistics"] = proposed_method_independent_features_statistics_min
+        e["min_dependent_features_statistics"] = proposed_method_dependent_features_statistics_min
+        e["max_independent_features_statistics"] = proposed_method_independent_features_statistics_max
+        e["max_dependent_features_statistics"] = proposed_method_dependent_features_statistics_max
+        e["top3_selected_features"] = proposed_method_top3_selected_features
         statistics.append(e)
-    
-    df = pd.DataFrame(feature_importances, columns=["Value"])
-    df = df.sort_values("Value", ascending=True)
-    df = df.reset_index()
-    proposed_method_independent_features_statistics_avg = df[df["index"] < 7]["Value"].mean()
-    proposed_method_dependent_features_statistics_avg = df[df["index"] >= 7]["Value"].mean()
-    proposed_method_independent_features_statistics_min = df[df["index"] < 7]["Value"].min()
-    proposed_method_dependent_features_statistics_min = df[df["index"] >= 7]["Value"].min()
-    proposed_method_independent_features_statistics_max = df[df["index"] < 7]["Value"].max()
-    proposed_method_dependent_features_statistics_max = df[df["index"] >= 7]["Value"].max()
-    proposed_method_top3_selected_features = str(sorted(df.tail(3)["index"].values.tolist()))
-    e = {"strength_of_noise": strength_of_noise}
-    e["Method"] = "Proposed_Method"
-    e["avg_independent_features_statistics"] = proposed_method_independent_features_statistics_avg
-    e["avg_dependent_features_statistics"] = proposed_method_dependent_features_statistics_avg
-    e["min_independent_features_statistics"] = proposed_method_independent_features_statistics_min
-    e["min_dependent_features_statistics"] = proposed_method_dependent_features_statistics_min
-    e["max_independent_features_statistics"] = proposed_method_independent_features_statistics_max
-    e["max_dependent_features_statistics"] = proposed_method_dependent_features_statistics_max
-    e["top3_selected_features"] = proposed_method_top3_selected_features
-    statistics.append(e)
+
+        finish_time = datetime.datetime.now()
+        print(f"Time taken: {finish_time - start_time}")
 
 statistics_df = pd.DataFrame(statistics)
 statistics_df["independent_vs_dependent_avg_statistics_diff_%"] = (statistics_df["avg_dependent_features_statistics"] - statistics_df["avg_independent_features_statistics"]) / statistics_df["avg_independent_features_statistics"] *100
@@ -257,4 +268,219 @@ print("========================================")
 print(f"Statistics")
 print("========================================")
 print(statistics_df.to_string())
+print()
+
+
+lognormal_results = []
+
+for strength_of_noise in statistics_df["strength_of_noise"].unique():
+    for method in statistics_df["Method"].unique():
+        subset = statistics_df[(statistics_df["strength_of_noise"] == strength_of_noise) & (statistics_df["Method"] == method)]
+        
+        # Check if the distribution of dependent statistics is lognormal
+        dependent_stats_avg = subset["avg_dependent_features_statistics"].replace(0, np.nan).dropna()
+        dependent_stats_min = subset["min_dependent_features_statistics"].replace(0, np.nan).dropna()
+        dependent_stats_max = subset["max_dependent_features_statistics"].replace(0, np.nan).dropna()
+        
+        # Check if the distribution of independent statistics is lognormal
+        independent_stats_avg = subset["avg_independent_features_statistics"].replace(0, np.nan).dropna()
+        independent_stats_min = subset["min_independent_features_statistics"].replace(0, np.nan).dropna()
+        independent_stats_max = subset["max_independent_features_statistics"].replace(0, np.nan).dropna()
+        
+        # Fit lognormal distribution and perform KS test for average statistics
+        if not dependent_stats_avg.empty:
+            shape_avg, loc_avg, scale_avg = stats.lognorm.fit(dependent_stats_avg, floc=0)
+            kstest_result_avg = stats.kstest(dependent_stats_avg, 'lognorm', args=(shape_avg, loc_avg, scale_avg))
+            ci_avg = stats.lognorm.interval(0.95, shape_avg, loc=loc_avg, scale=scale_avg)
+        else:
+            kstest_result_avg = stats.kstest([0], 'lognorm', args=(0, 0, 1))  # Default result for empty data
+            ci_avg = (0, 0)
+        
+        if not independent_stats_avg.empty:
+            shape_ind_avg, loc_ind_avg, scale_ind_avg = stats.lognorm.fit(independent_stats_avg, floc=0)
+            kstest_result_ind_avg = stats.kstest(independent_stats_avg, 'lognorm', args=(shape_ind_avg, loc_ind_avg, scale_ind_avg))
+            ci_ind_avg = stats.lognorm.interval(0.95, shape_ind_avg, loc=loc_ind_avg, scale=scale_ind_avg)
+        else:
+            kstest_result_ind_avg = stats.kstest([0], 'lognorm', args=(0, 0, 1))  # Default result for empty data
+            ci_ind_avg = (0, 0)
+        
+        # Fit lognormal distribution and perform KS test for min statistics
+        if not dependent_stats_min.empty:
+            shape_min, loc_min, scale_min = stats.lognorm.fit(dependent_stats_min, floc=0)
+            kstest_result_min = stats.kstest(dependent_stats_min, 'lognorm', args=(shape_min, loc_min, scale_min))
+            ci_min = stats.lognorm.interval(0.95, shape_min, loc=loc_min, scale=scale_min)
+        else:
+            kstest_result_min = stats.kstest([0], 'lognorm', args=(0, 0, 1))  # Default result for empty data
+            ci_min = (0, 0)
+        
+        if not independent_stats_min.empty:
+            shape_ind_min, loc_ind_min, scale_ind_min = stats.lognorm.fit(independent_stats_min, floc=0)
+            kstest_result_ind_min = stats.kstest(independent_stats_min, 'lognorm', args=(shape_ind_min, loc_ind_min, scale_ind_min))
+            ci_ind_min = stats.lognorm.interval(0.95, shape_ind_min, loc=loc_ind_min, scale=scale_ind_min)
+        else:
+            kstest_result_ind_min = stats.kstest([0], 'lognorm', args=(0, 0, 1))  # Default result for empty data
+            ci_ind_min = (0, 0)
+        
+        # Fit lognormal distribution and perform KS test for max statistics
+        if not dependent_stats_max.empty:
+            shape_max, loc_max, scale_max = stats.lognorm.fit(dependent_stats_max, floc=0)
+            kstest_result_max = stats.kstest(dependent_stats_max, 'lognorm', args=(shape_max, loc_max, scale_max))
+            ci_max = stats.lognorm.interval(0.95, shape_max, loc=loc_max, scale=scale_max)
+        else:
+            kstest_result_max = stats.kstest([0], 'lognorm', args=(0, 0, 1))  # Default result for empty data
+            ci_max = (0, 0)
+        
+        if not independent_stats_max.empty:
+            shape_ind_max, loc_ind_max, scale_ind_max = stats.lognorm.fit(independent_stats_max, floc=0)
+            kstest_result_ind_max = stats.kstest(independent_stats_max, 'lognorm', args=(shape_ind_max, loc_ind_max, scale_ind_max))
+            ci_ind_max = stats.lognorm.interval(0.95, shape_ind_max, loc=loc_ind_max, scale=scale_ind_max)
+        else:
+            kstest_result_ind_max = stats.kstest([0], 'lognorm', args=(0, 0, 1))  # Default result for empty data
+            ci_ind_max = (0, 0)
+        
+        lognormal_results.append({
+            "strength_of_noise": strength_of_noise,
+            "Method": method,
+            "dependent_avg_statistic": kstest_result_avg.statistic,
+            "dependent_avg_pvalue": kstest_result_avg.pvalue,
+            "dependent_avg_is_lognormal": kstest_result_avg.pvalue > 0.05,
+            "dependent_avg_shape": shape_avg,
+            "dependent_avg_loc": loc_avg,
+            "dependent_avg_scale": scale_avg,
+            "dependent_avg_ci_lower": ci_avg[0],
+            "dependent_avg_ci_upper": ci_avg[1],
+            "dependent_min_statistic": kstest_result_min.statistic,
+            "dependent_min_pvalue": kstest_result_min.pvalue,
+            "dependent_min_is_lognormal": kstest_result_min.pvalue > 0.05,
+            "dependent_min_shape": shape_min,
+            "dependent_min_loc": loc_min,
+            "dependent_min_scale": scale_min,
+            "dependent_min_ci_lower": ci_min[0],
+            "dependent_min_ci_upper": ci_min[1],
+            "dependent_max_statistic": kstest_result_max.statistic,
+            "dependent_max_pvalue": kstest_result_max.pvalue,
+            "dependent_max_is_lognormal": kstest_result_max.pvalue > 0.05,
+            "dependent_max_shape": shape_max,
+            "dependent_max_loc": loc_max,
+            "dependent_max_scale": scale_max,
+            "dependent_max_ci_lower": ci_max[0],
+            "dependent_max_ci_upper": ci_max[1],
+            "ind_avg_statistic": kstest_result_ind_avg.statistic,
+            "ind_avg_pvalue": kstest_result_ind_avg.pvalue,
+            "ind_avg_is_lognormal": kstest_result_ind_avg.pvalue > 0.05,
+            "ind_avg_shape": shape_ind_avg,
+            "ind_avg_loc": loc_ind_avg,
+            "ind_avg_scale": scale_ind_avg,
+            "ind_avg_ci_lower": ci_ind_avg[0],
+            "ind_avg_ci_upper": ci_ind_avg[1],
+            "ind_min_statistic": kstest_result_ind_min.statistic,
+            "ind_min_pvalue": kstest_result_ind_min.pvalue,
+            "ind_min_is_lognormal": kstest_result_ind_min.pvalue > 0.05,
+            "ind_min_shape": shape_ind_min,
+            "ind_min_loc": loc_ind_min,
+            "ind_min_scale": scale_ind_min,
+            "ind_min_ci_lower": ci_ind_min[0],
+            "ind_min_ci_upper": ci_ind_min[1],
+            "ind_max_statistic": kstest_result_ind_max.statistic,
+            "ind_max_pvalue": kstest_result_ind_max.pvalue,
+            "ind_max_is_lognormal": kstest_result_ind_max.pvalue > 0.05,
+            "ind_max_shape": shape_ind_max,
+            "ind_max_loc": loc_ind_max,
+            "ind_max_scale": scale_ind_max,
+            "ind_max_ci_lower": ci_ind_max[0],
+            "ind_max_ci_upper": ci_ind_max[1]
+        })
+        
+        # Plot QQ-plots and scatter plots for each statistic
+        fig, axes = plt.subplots(4, 3, figsize=(15, 20))
+        
+        # QQ plots for dependent statistics
+        stats.probplot(dependent_stats_avg, dist="lognorm", sparams=(shape_avg, loc_avg, scale_avg), plot=axes[0, 0])
+        axes[0, 0].set_title(f'QQ Plot - Avg Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        stats.probplot(dependent_stats_min, dist="lognorm", sparams=(shape_min, loc_min, scale_min), plot=axes[0, 1])
+        axes[0, 1].set_title(f'QQ Plot - Min Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        stats.probplot(dependent_stats_max, dist="lognorm", sparams=(shape_max, loc_max, scale_max), plot=axes[0, 2])
+        axes[0, 2].set_title(f'QQ Plot - Max Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        # QQ plots for independent statistics
+        stats.probplot(independent_stats_avg, dist="lognorm", sparams=(shape_ind_avg, loc_ind_avg, scale_ind_avg), plot=axes[1, 0])
+        axes[1, 0].set_title(f'QQ Plot - Avg Independent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        stats.probplot(independent_stats_min, dist="lognorm", sparams=(shape_ind_min, loc_ind_min, scale_ind_min), plot=axes[1, 1])
+        axes[1, 1].set_title(f'QQ Plot - Min Independent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        stats.probplot(independent_stats_max, dist="lognorm", sparams=(shape_ind_max, loc_ind_max, scale_ind_max), plot=axes[1, 2])
+        axes[1, 2].set_title(f'QQ Plot - Max Independent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        # Scatter plots with lognormal distribution for dependent statistics
+        x_avg = np.linspace(dependent_stats_avg.min(), dependent_stats_avg.max(), 100)
+        axes[2, 0].scatter(dependent_stats_avg, np.zeros_like(dependent_stats_avg), alpha=0.5)
+        axes[2, 0].plot(x_avg, stats.lognorm.pdf(x_avg, shape_avg, loc=loc_avg, scale=scale_avg), 'r-', lw=2)
+        axes[2, 0].set_title(f'Scatter Plot - Avg Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        x_min = np.linspace(dependent_stats_min.min(), dependent_stats_min.max(), 100)
+        axes[2, 1].scatter(dependent_stats_min, np.zeros_like(dependent_stats_min), alpha=0.5)
+        axes[2, 1].plot(x_min, stats.lognorm.pdf(x_min, shape_min, loc=loc_min, scale=scale_min), 'r-', lw=2)
+        axes[2, 1].set_title(f'Scatter Plot - Min Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        x_max = np.linspace(dependent_stats_max.min(), dependent_stats_max.max(), 100)
+        axes[2, 2].scatter(dependent_stats_max, np.zeros_like(dependent_stats_max), alpha=0.5)
+        axes[2, 2].plot(x_max, stats.lognorm.pdf(x_max, shape_max, loc=loc_max, scale=scale_max), 'r-', lw=2)
+        axes[2, 2].set_title(f'Scatter Plot - Max Dependent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        # Scatter plots with lognormal distribution for independent statistics
+        x_ind_avg = np.linspace(independent_stats_avg.min(), independent_stats_avg.max(), 100)
+        axes[3, 0].scatter(independent_stats_avg, np.zeros_like(independent_stats_avg), alpha=0.5)
+        axes[3, 0].plot(x_ind_avg, stats.lognorm.pdf(x_ind_avg, shape_ind_avg, loc=loc_ind_avg, scale=scale_ind_avg), 'r-', lw=2)
+        axes[3, 0].set_title(f'Scatter Plot - Avg Independent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        x_ind_min = np.linspace(independent_stats_min.min(), independent_stats_min.max(), 100)
+        axes[3, 1].scatter(independent_stats_min, np.zeros_like(independent_stats_min), alpha=0.5)
+        axes[3, 1].plot(x_ind_min, stats.lognorm.pdf(x_ind_min, shape_ind_min, loc=loc_ind_min, scale=scale_ind_min), 'r-', lw=2)
+        axes[3, 1].set_title(f'Scatter Plot - Min Independent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        x_ind_max = np.linspace(independent_stats_max.min(), independent_stats_max.max(), 100)
+        axes[3, 2].scatter(independent_stats_max, np.zeros_like(independent_stats_max), alpha=0.5)
+        axes[3, 2].plot(x_ind_max, stats.lognorm.pdf(x_ind_max, shape_ind_max, loc=loc_ind_max, scale=scale_ind_max), 'r-', lw=2)
+        axes[3, 2].set_title(f'Scatter Plot - Max Independent Stats\n{method} - Noise: {strength_of_noise}')
+        
+        plt.tight_layout()
+        plt.show()
+
+lognormal_df = pd.DataFrame(lognormal_results)
+
+# Split into six tables using .loc to avoid SettingWithCopyWarning
+avg_df = lognormal_df.loc[:, ['strength_of_noise', 'Method', 'dependent_avg_statistic', 'dependent_avg_pvalue', 'dependent_avg_is_lognormal', 'dependent_avg_shape', 'dependent_avg_loc', 'dependent_avg_scale', 'dependent_avg_ci_lower', 'dependent_avg_ci_upper']].copy()
+min_df = lognormal_df.loc[:, ['strength_of_noise', 'Method', 'dependent_min_statistic', 'dependent_min_pvalue', 'dependent_min_is_lognormal', 'dependent_min_shape', 'dependent_min_loc', 'dependent_min_scale', 'dependent_min_ci_lower', 'dependent_min_ci_upper']].copy()
+max_df = lognormal_df.loc[:, ['strength_of_noise', 'Method', 'dependent_max_statistic', 'dependent_max_pvalue', 'dependent_max_is_lognormal', 'dependent_max_shape', 'dependent_max_loc', 'dependent_max_scale', 'dependent_max_ci_lower', 'dependent_max_ci_upper']].copy()
+ind_avg_df = lognormal_df.loc[:, ['strength_of_noise', 'Method', 'ind_avg_statistic', 'ind_avg_pvalue', 'ind_avg_is_lognormal', 'ind_avg_shape', 'ind_avg_loc', 'ind_avg_scale', 'ind_avg_ci_lower', 'ind_avg_ci_upper']].copy()
+ind_min_df = lognormal_df.loc[:, ['strength_of_noise', 'Method', 'ind_min_statistic', 'ind_min_pvalue', 'ind_min_is_lognormal', 'ind_min_shape', 'ind_min_loc', 'ind_min_scale', 'ind_min_ci_lower', 'ind_min_ci_upper']].copy()
+ind_max_df = lognormal_df.loc[:, ['strength_of_noise', 'Method', 'ind_max_statistic', 'ind_max_pvalue', 'ind_max_is_lognormal', 'ind_max_shape', 'ind_max_loc', 'ind_max_scale', 'ind_max_ci_lower', 'ind_max_ci_upper']].copy()
+
+# Rename columns for clarity
+avg_df.columns = ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'shape', 'loc', 'scale', 'ci_lower', 'ci_upper']
+min_df.columns = ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'shape', 'loc', 'scale', 'ci_lower', 'ci_upper']
+max_df.columns = ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'shape', 'loc', 'scale', 'ci_lower', 'ci_upper']
+ind_avg_df.columns = ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'shape', 'loc', 'scale', 'ci_lower', 'ci_upper']
+ind_min_df.columns = ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'shape', 'loc', 'scale', 'ci_lower', 'ci_upper']
+ind_max_df.columns = ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'shape', 'loc', 'scale', 'ci_lower', 'ci_upper']
+
+# Add a new column to identify the type
+avg_df.loc[:, 'type'] = 'avg_dependent'
+min_df.loc[:, 'type'] = 'min_dependent'
+max_df.loc[:, 'type'] = 'max_dependent'
+ind_avg_df.loc[:, 'type'] = 'avg_independent'
+ind_min_df.loc[:, 'type'] = 'min_independent'
+ind_max_df.loc[:, 'type'] = 'max_independent'
+
+# Concatenate the tables
+final_df = pd.concat([avg_df, min_df, max_df, ind_avg_df, ind_min_df, ind_max_df])
+
+print()
+print("========================================")
+print(f"Lognormal Test Results")
+print("========================================")
+print(final_df.to_string())
 print()
