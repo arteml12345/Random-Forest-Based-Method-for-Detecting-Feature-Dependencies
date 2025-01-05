@@ -12,12 +12,11 @@ import datetime
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 import scipy.stats as stats
-
+from scipy.stats import mannwhitneyu, ttest_ind
 import warnings
 
 # Suppress all DeprecationWarnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 
 # Function to generate the dataset with a fixed random seed
 def generate_dataset(strength_of_noise, n_samples=10000, random_seed=None):
@@ -50,12 +49,10 @@ def generate_dataset(strength_of_noise, n_samples=10000, random_seed=None):
 # dataset = generate_dataset(strength_of_noise=1.0, random_seed=42)
 # print(dataset.shape)  # Output: (10000, 10)
 
-
 # Function to calculate Pearson correlation
 def pearson_correlation(dataset):
     corr_matrix = np.corrcoef(dataset, rowvar=False)
-    return corr_matrix
-
+    return np.abs(corr_matrix)
 
 # Function to calculate Mutual Information between pairs of features
 def mutual_information(dataset):
@@ -68,7 +65,6 @@ def mutual_information(dataset):
             mi_scores[i, j] = mutual_info_regression(dataset[:, i].reshape(-1, 1), dataset[:, j])
             mi_scores[j, i] = mi_scores[i, j]  # Symmetry
     return mi_scores
-
 
 # Function to calculate Conditional Entropy (using discretization) between pairs of features
 def conditional_entropy(dataset, n_bins=10):
@@ -86,7 +82,6 @@ def conditional_entropy(dataset, n_bins=10):
             ce_scores[j, i] = ce_scores[i, j]  # Symmetry
     return ce_scores
 
-
 # Function to calculate Correlation of Distances (using dcor) between pairs of features
 def correlation_of_distances(dataset):
     n_features = dataset.shape[1]
@@ -98,7 +93,6 @@ def correlation_of_distances(dataset):
             dcor_scores[i, j] = dcor.distance_correlation(dataset[:, i], dataset[:, j])
             dcor_scores[j, i] = dcor_scores[i, j]  # Symmetry
     return dcor_scores
-
 
 # Function to run competitor methods on the dataset
 def competitor_methods(dataset):
@@ -113,7 +107,6 @@ def competitor_methods(dataset):
         "Conditional Entropy": ce_scores,
         "Distance Correlation": dcor_scores
     }
-
 
 # Function to implement the proposed method with empirical distribution-based synthetic data generation
 def proposed_method(dataset, random_seed=None):
@@ -158,7 +151,7 @@ def proposed_method(dataset, random_seed=None):
     
     return accuracy, feature_importances, best_rf
 
-
+# Helper function to flatten DataFrame
 def _flatten_df(df_input):
     df = copy.deepcopy(df_input)
     data = df.values
@@ -169,20 +162,20 @@ def _flatten_df(df_input):
     flattened_df = flattened_df.dropna(axis=0)
     return flattened_df
 
-
+# Helper function to get statistics of independent features
 def _get_statistic_of_independent_features(df_input):
     df = copy.deepcopy(df_input)
     df = df[(df['feature_1'] < 7) | (df['feature_2'] < 7)]
     return df["Value"].mean(), df["Value"].min(), df["Value"].max()
 
-
+# Helper function to get statistics of dependent features
 def _get_statistic_of_dependent_features(df_input):
     df = copy.deepcopy(df_input)
     df = df[df['feature_1'] >= 7]
     df = df[df['feature_2'] >= 7]
     return df["Value"].mean(), df["Value"].min(), df["Value"].max()
 
-
+# Helper function to get top 3 features from competitors
 def _get_top3_features_competitors(df_input):
     df = copy.deepcopy(df_input)
     df = df.sort_values("Value", ascending=True)
@@ -191,6 +184,9 @@ def _get_top3_features_competitors(df_input):
     result = sorted(list(set(result)))
     return result
 
+################################################################################
+# Main code to generate statistics
+################################################################################
 
 statistics = []
 n=3
@@ -200,28 +196,7 @@ for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 1
         dataset = generate_dataset(strength_of_noise=strength_of_noise, random_seed=42+iteration)
         competitor_results = competitor_methods(dataset)
 
-        # print("========================================")
-        # print(f"strength_of_noise: {strength_of_noise}")
-        # print("========================================")
-
-        # print("Pearson_Correlation:")
-        # print(pd.DataFrame(competitor_results["Pearson Correlation"]).abs().to_string())
-        # print()
-        # print("Mutual_Information:")
-        # print(pd.DataFrame(competitor_results["Mutual Information"]).to_string())
-        # print()
-        # print("Conditional_Entropy:")
-        # print(pd.DataFrame(competitor_results["Conditional Entropy"]).to_string())
-        # print()
-        # print("Distance_Correlation:")
-        # print(pd.DataFrame(competitor_results["Distance Correlation"]).to_string())
-        # print()
-
-        accuracy, feature_importances, best_rf = proposed_method(dataset, random_seed=42)
-        # print("The Proposed Method:")
-        # print("Accuracy:", accuracy)
-        # print("Feature Importances:", pd.DataFrame(feature_importances).to_string())
-
+        # Calculate statistics for each competitor method
         for alias in ["Pearson Correlation", "Mutual Information", "Conditional Entropy", "Distance Correlation"]:
             e = {"strength_of_noise": strength_of_noise}
             df = pd.DataFrame(competitor_results[alias])
@@ -235,6 +210,8 @@ for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 1
             e["top3_selected_features"] = _get_top3_features_competitors(df)
             statistics.append(e)
         
+        # Calculate statistics for the proposed method
+        accuracy, feature_importances, best_rf = proposed_method(dataset, random_seed=42)
         df = pd.DataFrame(feature_importances, columns=["Value"])
         df = df.sort_values("Value", ascending=True)
         df = df.reset_index()
@@ -260,6 +237,7 @@ for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 1
         finish_time = datetime.datetime.now()
         print(f"Time taken: {finish_time - start_time}")
 
+# Convert statistics to DataFrame and calculate additional statistics
 statistics_df = pd.DataFrame(statistics)
 statistics_df["independent_vs_dependent_avg_statistics_diff_%"] = (statistics_df["avg_dependent_features_statistics"] - statistics_df["avg_independent_features_statistics"]) / statistics_df["avg_independent_features_statistics"] *100
 statistics_df["independent_vs_dependent_avg_statistics_diff_%"] = statistics_df["independent_vs_dependent_avg_statistics_diff_%"].round(2)
@@ -271,6 +249,116 @@ print(statistics_df.to_string())
 print()
 
 
+################################################################################
+# Perform statistical testing to compare independent and dependent feature statistics with t-test
+################################################################################
+comparison_results_ttest = []
+
+for strength_of_noise in statistics_df["strength_of_noise"].unique():
+    for method in statistics_df["Method"].unique():
+        subset = statistics_df[(statistics_df["strength_of_noise"] == strength_of_noise) & (statistics_df["Method"] == method)]
+        
+        for ind_stat, dep_stat in [("min", "min"),
+                                   ("min", "avg"),
+                                   ("min", "max"),
+                                   ("avg", "min"),
+                                   ("avg", "avg"),
+                                   ("avg", "max"),
+                                   ("max", "min"),
+                                   ("max", "avg"),
+                                   ("max", "max")]:
+            
+            ind_values = subset[f"{ind_stat}_independent_features_statistics"].replace(0, np.nan).dropna()
+            dep_values = subset[f"{dep_stat}_dependent_features_statistics"].replace(0, np.nan).dropna()
+            
+            if not ind_values.empty and not dep_values.empty:
+                # Apply log transformation
+                log_ind_values = np.log(ind_values)
+                log_dep_values = np.log(dep_values)
+                
+                t_stat, p_value = stats.ttest_ind(log_ind_values, log_dep_values, alternative='less')
+                avg_ind_stat_value = ind_values.mean()
+                avg_dep_stat_value = dep_values.mean()
+                comparison_results_ttest.append({
+                    "strength_of_noise": strength_of_noise,
+                    "Method": method,
+                    "ind_stat": ind_stat,
+                    "dep_stat": dep_stat,
+                    #"t_stat": t_stat,
+                    "p_value": p_value,
+                    "avg_ind_stat_value": avg_ind_stat_value,
+                    "avg_dep_stat_value": avg_dep_stat_value
+                })
+
+comparison_df_ttest = pd.DataFrame(comparison_results_ttest)
+comparison_df_ttest = comparison_df_ttest.sort_values(by=["Method", "strength_of_noise", "ind_stat", "dep_stat"])
+print()
+print("========================================")
+print(f"t-test; Comparison Results - Independent vs Dependent Feature Statistics")
+print("========================================")
+print(comparison_df_ttest.to_string())
+print()
+print("========================================")
+print(f"t-test; Comparison Results - Independent vs Dependent Feature Statistics SHORT")
+print("========================================")
+print(comparison_df_ttest[(comparison_df_ttest["ind_stat"] == "max") & (comparison_df_ttest["dep_stat"] == "min")].to_string())
+print()
+
+################################################################################
+# Perform statistical testing to compare independent and dependent feature statistics with Mann-Whitney U test
+################################################################################
+comparison_results_mannwhitneyu = []
+
+for strength_of_noise in statistics_df["strength_of_noise"].unique():
+    for method in statistics_df["Method"].unique():
+        subset = statistics_df[(statistics_df["strength_of_noise"] == strength_of_noise) & (statistics_df["Method"] == method)]
+        
+        for ind_stat, dep_stat in [("min", "min"),
+                                   ("min", "avg"),
+                                   ("min", "max"),
+                                   ("avg", "min"),
+                                   ("avg", "avg"),
+                                   ("avg", "max"),
+                                   ("max", "min"),
+                                   ("max", "avg"),
+                                   ("max", "max")]:
+            
+            ind_values = subset[f"{ind_stat}_independent_features_statistics"].replace(0, np.nan).dropna()
+            dep_values = subset[f"{dep_stat}_dependent_features_statistics"].replace(0, np.nan).dropna()
+            
+            if not ind_values.empty and not dep_values.empty:
+                u_stat, p_value = stats.mannwhitneyu(ind_values, dep_values, alternative='less')
+                avg_ind_stat_value = ind_values.mean()
+                avg_dep_stat_value = dep_values.mean()
+                comparison_results_mannwhitneyu.append({
+                    "strength_of_noise": strength_of_noise,
+                    "Method": method,
+                    "ind_stat": ind_stat,
+                    "dep_stat": dep_stat,
+                    #"u_stat": u_stat,
+                    "p_value": p_value,
+                    "avg_ind_stat_value": avg_ind_stat_value,
+                    "avg_dep_stat_value": avg_dep_stat_value
+                })
+
+comparison_df_mannwhitneyu = pd.DataFrame(comparison_results_mannwhitneyu)
+comparison_df_mannwhitneyu = comparison_df_mannwhitneyu.sort_values(by=["Method", "strength_of_noise", "ind_stat", "dep_stat"])
+print()
+print("========================================")
+print(f"Mann-Whitney U test; Comparison Results - Independent vs Dependent Feature Statistics")
+print("========================================")
+print(comparison_df_mannwhitneyu.to_string())
+print()
+print("========================================")
+print(f"Mann-Whitney U test; Comparison Results - Independent vs Dependent Feature Statistics SHORT")
+print("========================================")
+print(comparison_df_mannwhitneyu[(comparison_df_mannwhitneyu["ind_stat"] == "max") & (comparison_df_mannwhitneyu["dep_stat"] == "min")].to_string())
+print()
+
+
+################################################################################
+# Lognormal test results of statistics distribution and confidence intervals calculation
+################################################################################
 lognormal_results = []
 
 for strength_of_noise in statistics_df["strength_of_noise"].unique():
@@ -475,12 +563,93 @@ ind_avg_df.loc[:, 'type'] = 'avg_independent'
 ind_min_df.loc[:, 'type'] = 'min_independent'
 ind_max_df.loc[:, 'type'] = 'max_independent'
 
-# Concatenate the tables
-final_df = pd.concat([avg_df, min_df, max_df, ind_avg_df, ind_min_df, ind_max_df])
+# Split the tables into three
+stat_pvalue_df = pd.concat([avg_df.loc[:, ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'type']],
+                            min_df.loc[:, ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'type']],
+                            max_df.loc[:, ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'type']],
+                            ind_avg_df.loc[:, ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'type']],
+                            ind_min_df.loc[:, ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'type']],
+                            ind_max_df.loc[:, ['strength_of_noise', 'Method', 'statistic', 'pvalue', 'is_lognormal', 'type']]])
+stat_pvalue_df = stat_pvalue_df.sort_values(by=["Method", "strength_of_noise", "type"])
 
+shape_loc_scale_df = pd.concat([avg_df.loc[:, ['strength_of_noise', 'Method', 'shape', 'loc', 'scale', 'type']],
+                                min_df.loc[:, ['strength_of_noise', 'Method', 'shape', 'loc', 'scale', 'type']],
+                                max_df.loc[:, ['strength_of_noise', 'Method', 'shape', 'loc', 'scale', 'type']],
+                                ind_avg_df.loc[:, ['strength_of_noise', 'Method', 'shape', 'loc', 'scale', 'type']],
+                                ind_min_df.loc[:, ['strength_of_noise', 'Method', 'shape', 'loc', 'scale', 'type']],
+                                ind_max_df.loc[:, ['strength_of_noise', 'Method', 'shape', 'loc', 'scale', 'type']]])
+shape_loc_scale_df = shape_loc_scale_df.sort_values(by=["Method", "strength_of_noise", "type"])
+ci_df = pd.concat([avg_df.loc[:, ['strength_of_noise', 'Method', 'ci_lower', 'ci_upper', 'type']],
+                   min_df.loc[:, ['strength_of_noise', 'Method', 'ci_lower', 'ci_upper', 'type']],
+                   max_df.loc[:, ['strength_of_noise', 'Method', 'ci_lower', 'ci_upper', 'type']],
+                   ind_avg_df.loc[:, ['strength_of_noise', 'Method', 'ci_lower', 'ci_upper', 'type']],
+                   ind_min_df.loc[:, ['strength_of_noise', 'Method', 'ci_lower', 'ci_upper', 'type']],
+                   ind_max_df.loc[:, ['strength_of_noise', 'Method', 'ci_lower', 'ci_upper', 'type']]])
+ci_df = ci_df.sort_values(by=["Method", "strength_of_noise", "type"])
 print()
 print("========================================")
-print(f"Lognormal Test Results")
+print(f"Lognormal Test Results - Statistics and P-values")
 print("========================================")
-print(final_df.to_string())
+print(stat_pvalue_df.to_string())
 print()
+print("========================================")
+print(f"Lognormal Test Results - Shape, Loc, and Scale")
+print("========================================")
+print(shape_loc_scale_df.to_string())
+print()
+print("========================================")
+print(f"Lognormal Test Results - Confidence Intervals")
+print("========================================")
+print(ci_df.to_string())
+print()
+print("========================================")
+print(f"Lognormal Test Results - Confidence Intervals SHORT")
+print("========================================")
+print(ci_df[(ci_df["type"] == "min_dependent") | (ci_df["type"] == "max_independent")].to_string())
+print()
+
+
+################################################################################
+# Create a figure for each method and strength of noise for comaping confidence intervals
+################################################################################
+methods = ci_df['Method'].unique()
+strengths_of_noise = ci_df['strength_of_noise'].unique()
+
+for method in methods:
+    for strength in strengths_of_noise:
+        method_strength_df = ci_df[(ci_df['Method'] == method) & (ci_df['strength_of_noise'] == strength)]
+        
+        if not method_strength_df.empty:
+            # Original charts for avg, min, max
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for dep_type in ['avg', 'min', 'max']:
+                dep_df = method_strength_df[method_strength_df['type'].str.contains(dep_type)]
+                if not dep_df.empty:
+                    ax.errorbar(dep_df['type'], dep_df['ci_lower'], 
+                                yerr=(dep_df['ci_upper'] - dep_df['ci_lower']) / 2, 
+                                fmt='o', label=f'{method} - {strength} - {dep_type}')
+            
+            ax.set_xlabel('Type (avg, min, max)')
+            ax.set_ylabel('Confidence Interval')
+            ax.set_title(f'Confidence Intervals for {method} at Noise Strength {strength}')
+            ax.legend()
+            ax.grid(True)
+            plt.show()
+            
+            # Additional charts for max_independent and min_dependent
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for dep_type in ['max_independent', 'min_dependent']:
+                dep_df = method_strength_df[method_strength_df['type'] == dep_type]
+                if not dep_df.empty:
+                    ax.errorbar(dep_df['type'], dep_df['ci_lower'], 
+                                yerr=(dep_df['ci_upper'] - dep_df['ci_lower']) / 2, 
+                                fmt='o', label=f'{method} - {strength} - {dep_type}')
+            
+            ax.set_xlabel('Type (max_independent, min_dependent)')
+            ax.set_ylabel('Confidence Interval')
+            ax.set_title(f'Confidence Intervals for {method} at Noise Strength {strength} (Additional)')
+            ax.legend()
+            ax.grid(True)
+            plt.show()
+
+
