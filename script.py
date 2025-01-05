@@ -248,6 +248,8 @@ statistics_df["independent_vs_dependent_avg_statistics_diff_%"] = statistics_df[
 # print(statistics_df.to_string())
 # print()
 
+statistics_df.to_csv("statistics.csv", index=False)
+
 ################################################################################
 # Calculate accuracy, sensitivity, precision, and recall for top3_selected_features
 ################################################################################
