@@ -33,7 +33,7 @@ def generate_dataset(strength_of_noise, n_samples=10000, random_seed=None):
     # Generate the third dependent feature based on 'local trigger' and 'slope'
     third_feature = np.where(local_trigger < 0, 
                              np.random.normal(0, 1, n_samples), 
-                             slope * 2 + strength_of_noise * np.random.normal(0, 1, n_samples))
+                             slope + strength_of_noise * np.random.normal(0, 1, n_samples))
     
     # Normalize the third feature (subtract mean and divide by standard deviation)
     third_feature = (third_feature - np.mean(third_feature)) / np.std(third_feature)
