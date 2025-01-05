@@ -234,10 +234,10 @@ for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 1
         competitor_results = competitor_methods(dataset)
 
         # Calculate statistics for each competitor method
-        for alias in ["Pearson Correlation", "Mutual Information", "Conditional Entropy", "Distance Correlation"]:
+        for alias in ["Pearson Correlation (abs)", "Mutual Information", "Conditional Entropy (inverse)", "Distance Correlation"]:
             e = {"strength_of_noise": strength_of_noise}
             df = pd.DataFrame(competitor_results[alias])
-            if alias == "Pearson Correlation":
+            if alias == "Pearson Correlation (abs)":
                 df = df.abs()
             df = _flatten_df(df)
             e["iteration"] = iteration
