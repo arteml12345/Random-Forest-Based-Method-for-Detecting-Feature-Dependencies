@@ -72,7 +72,7 @@ def conditional_entropy_inverse(dataset, n_bins=5):
     ce_scores = np.zeros((n_features, n_features))
     
     # Discretize the features
-    discretizer = KBinsDiscretizer(n_bins=n_bins, encode='ordinal', strategy='uniform')
+    discretizer = KBinsDiscretizer(n_bins=n_bins, encode='ordinal', strategy='quantile')
     discretized_data = discretizer.fit_transform(dataset)
     
     # Calculate conditional entropy for each pair of features
@@ -91,7 +91,7 @@ def conditional_entropy_inverse(dataset, n_bins=5):
                 
                 ce = max(0, -ce)
                 if ce == 0:
-                    ce_scores[i, j] = np.nan
+                    ce_scores[i, j] = 0
                 else:
                     ce_scores[i, j] = 1 / ce
     return ce_scores
