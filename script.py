@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as stats
 from scipy.stats import mannwhitneyu, ttest_ind
 import warnings
-
+import ast
 # Suppress all DeprecationWarnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -241,12 +241,73 @@ for strength_of_noise in [0.01, 10]: #[0.01, 0.1, 0.25, 0.5, 0.75, 0.90, 1, 2, 1
 statistics_df = pd.DataFrame(statistics)
 statistics_df["independent_vs_dependent_avg_statistics_diff_%"] = (statistics_df["avg_dependent_features_statistics"] - statistics_df["avg_independent_features_statistics"]) / statistics_df["avg_independent_features_statistics"] *100
 statistics_df["independent_vs_dependent_avg_statistics_diff_%"] = statistics_df["independent_vs_dependent_avg_statistics_diff_%"].round(2)
+# print()
+# print("========================================")
+# print(f"Statistics")
+# print("========================================")
+# print(statistics_df.to_string())
+# print()
+
+################################################################################
+# Calculate accuracy, sensitivity, precision, and recall for top3_selected_features
+################################################################################
+accuracy_results = []
+
+for strength_of_noise in statistics_df["strength_of_noise"].unique():
+    for method in statistics_df["Method"].unique():
+        subset = statistics_df[(statistics_df["strength_of_noise"] == strength_of_noise) & (statistics_df["Method"] == method)]
+        
+        true_positive = 0
+        false_positive = 0
+        false_negative = 0
+        true_negative = 0
+        
+        for index, row in subset.iterrows():
+            # Safely evaluate the string representation of the list
+            # try:
+            #     top3_features = ast.literal_eval(row["top3_selected_features"])
+            #     if not isinstance(top3_features, list):
+            #         raise ValueError("top3_selected_features is not a list")
+            # except (ValueError, SyntaxError) as e:
+            #     top3_features = row["top3_selected_features"]
+            
+            top3_features = row["top3_selected_features"]
+            if isinstance(top3_features, str):
+                top3_features = ast.literal_eval(top3_features)
+            elif isinstance(top3_features, list):
+                top3_features = top3_features
+            else:
+                raise ValueError("top3_selected_features is not a list or a string")
+            
+            
+            true_positives = len([feature for feature in top3_features if feature in [7, 8, 9]])
+            false_positives = len([feature for feature in top3_features if feature not in [7, 8, 9]])
+            false_negatives = 3 - true_positives
+            true_negatives = 0  # Since we are only considering top 3 features, true negatives are not applicable here
+            
+            true_positive += true_positives
+            false_positive += false_positives
+            false_negative += false_negatives
+        
+        accuracy = true_positive / (true_positive + false_positive + false_negative) if (true_positive + false_positive + false_negative) > 0 else 0
+        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) > 0 else 0
+        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) > 0 else 0
+        
+        accuracy_results.append({
+            "strength_of_noise": strength_of_noise,
+            "Method": method,
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall
+        })
+
+accuracy_df = pd.DataFrame(accuracy_results)
+accuracy_df = accuracy_df.sort_values(by=["Method", "strength_of_noise"])
 print()
 print("========================================")
-print(f"Statistics")
+print(f"Accuracy, Sensitivity, Precision, and Recall for top3_selected_features")
 print("========================================")
-print(statistics_df.to_string())
-print()
+print(accuracy_df.to_string())
 
 
 ################################################################################
@@ -272,9 +333,9 @@ for strength_of_noise in statistics_df["strength_of_noise"].unique():
             dep_values = subset[f"{dep_stat}_dependent_features_statistics"].replace(0, np.nan).dropna()
             
             if not ind_values.empty and not dep_values.empty:
-                # Apply log transformation
-                log_ind_values = np.log(ind_values)
-                log_dep_values = np.log(dep_values)
+                # Apply log transformation, adding a small constant to avoid log(0)
+                log_ind_values = np.log(ind_values + 1e-9)
+                log_dep_values = np.log(dep_values + 1e-9)
                 
                 t_stat, p_value = stats.ttest_ind(log_ind_values, log_dep_values, alternative='less')
                 avg_ind_stat_value = ind_values.mean()
@@ -286,8 +347,9 @@ for strength_of_noise in statistics_df["strength_of_noise"].unique():
                     "dep_stat": dep_stat,
                     #"t_stat": t_stat,
                     "p_value": p_value,
-                    "avg_ind_stat_value": avg_ind_stat_value,
-                    "avg_dep_stat_value": avg_dep_stat_value
+                    #"avg_ind_stat_value": avg_ind_stat_value,
+                    #"avg_dep_stat_value": avg_dep_stat_value,
+                    "dep_stat_greater_than_ind_stat": avg_ind_stat_value < avg_dep_stat_value
                 })
 
 comparison_df_ttest = pd.DataFrame(comparison_results_ttest)
@@ -337,8 +399,9 @@ for strength_of_noise in statistics_df["strength_of_noise"].unique():
                     "dep_stat": dep_stat,
                     #"u_stat": u_stat,
                     "p_value": p_value,
-                    "avg_ind_stat_value": avg_ind_stat_value,
-                    "avg_dep_stat_value": avg_dep_stat_value
+                    #"avg_ind_stat_value": avg_ind_stat_value,
+                    #"avg_dep_stat_value": avg_dep_stat_value,
+                    "dep_stat_greater_than_ind_stat": avg_ind_stat_value < avg_dep_stat_value
                 })
 
 comparison_df_mannwhitneyu = pd.DataFrame(comparison_results_mannwhitneyu)
