@@ -170,7 +170,7 @@ def _get_top3_features_competitors(df_input):
 ################################################################################
 
 statistics = []
-n=3
+n=100
 for strength_of_noise in [0.01, 0.1, 1, 10]: 
     for iteration in range(n):
         start_time = datetime.datetime.now()
