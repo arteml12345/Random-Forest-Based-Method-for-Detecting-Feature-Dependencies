@@ -264,15 +264,7 @@ for strength_of_noise in statistics_df["strength_of_noise"].unique():
         false_negative = 0
         true_negative = 0
         
-        for index, row in subset.iterrows():
-            # Safely evaluate the string representation of the list
-            # try:
-            #     top3_features = ast.literal_eval(row["top3_selected_features"])
-            #     if not isinstance(top3_features, list):
-            #         raise ValueError("top3_selected_features is not a list")
-            # except (ValueError, SyntaxError) as e:
-            #     top3_features = row["top3_selected_features"]
-            
+        for index, row in subset.iterrows():            
             top3_features = row["top3_selected_features"]
             if isinstance(top3_features, str):
                 top3_features = ast.literal_eval(top3_features)
